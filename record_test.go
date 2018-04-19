@@ -418,6 +418,54 @@ func TestRecordFieldUnionInvalidDefaultValue(t *testing.T) {
 		"default value ought to encode using field schema")
 }
 
+func TestRecordRecursiveRoundTripWithRaw(t *testing.T) {
+	codec, err := NewCodec(`
+{
+  "type": "record",
+  "name": "LongList",                  
+  "fields" : [
+    {"name": "next", "type": ["null", "LongList"], "default": null}
+  ]
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// NOTE: May omit fields when using default value
+	initial := `{"next":{"LongList":{}}}`
+
+	// NOTE: Textual encoding will show all fields, even those with values that
+	// match their default values
+	final := `{"next":{"LongList":{"next":null}}}`
+
+	// Convert textual Avro data (in Avro JSON format) to native Go form
+	datum, _, err := codec.NativeFromTextual([]byte(initial))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Convert native Go form to binary Avro data
+	buf, err := codec.RawFromNative(nil, datum)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Convert binary Avro data back to native Go form
+	datum, _, err = codec.NativeFromRaw(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Convert native Go form to textual Avro data
+	buf, err = codec.TextualFromNative(nil, datum)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actual, expected := string(buf), final; actual != expected {
+		t.Fatalf("GOT: %v; WANT: %v", actual, expected)
+	}
+}
 func TestRecordRecursiveRoundTrip(t *testing.T) {
 	codec, err := NewCodec(`
 {

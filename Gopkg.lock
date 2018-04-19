@@ -8,6 +8,18 @@
   revision = "553a641470496b2327abcac10b36396bd98e45c9"
 
 [[projects]]
+  name = "github.com/karrick/goavro"
+  packages = ["."]
+  revision = "e7ad0545b03f90a21d7775313ec18e00f22c17ff"
+  version = "v0.3.2"
+
+[[projects]]
+  name = "github.com/linkedin/goavro"
+  packages = ["."]
+  revision = "94a7a9db615f35a39dd2b82089398b92fabad2ba"
+  version = "v2.1.0"
+
+[[projects]]
   name = "gopkg.in/linkedin/goavro.v1"
   packages = ["."]
   revision = "45b9a0062a837ab3214741a91bff89e2a2e4fae6"
@@ -16,6 +28,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3badedae1f576bec3315e8c72e8e390df4ad16cdc4a5750c6468076ff5fba6c3"
+  inputs-digest = "478f58ccf1d7a4532f9a9c3151d60a7837241cca979218b63c84048d2f767830"
   solver-name = "gps-cdcl"
   solver-version = 1

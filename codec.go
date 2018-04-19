@@ -13,10 +13,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+    "errors"
+    "bytes"
 )
 
-var (
-	// MaxBlockCount is the maximum number of data items allowed in a single
+var ( // MaxBlockCount is the maximum number of data items allowed in a single
 	// block that will be decoded from a binary stream, whether when reading
 	// blocks to decode an array or a map, or when reading blocks from an OCF
 	// stream. This check is to ensure decoding binary data will not cause the
@@ -46,6 +47,10 @@ var (
 type Codec struct {
 	typeName *name
 	schema   string
+    canonicalSchema string
+    schemaFingerprint []byte
+
+    avroHeader []byte
 
 	nativeFromTextual func([]byte) (interface{}, []byte, error)
 	binaryFromNative  func([]byte, interface{}) ([]byte, error)
@@ -168,6 +173,13 @@ func NewCodec(schemaSpecification string) (*Codec, error) {
 			return nil, fmt.Errorf("cannot remarshal schema: %s", err)
 		}
 		c.schema = string(compact)
+        c.canonicalSchema = parsingCanonicalForm(schema)
+        rabin := NewRabin()
+        c.schemaFingerprint = rabin.Fingerprint([]byte(c.canonicalSchema))
+
+        c.avroHeader = make([]byte, 2)
+        c.avroHeader[0] = 0xC3
+        c.avroHeader[1] = 0x01
 	}
 	return c, err
 }
@@ -220,6 +232,17 @@ func (c *Codec) BinaryFromNative(buf []byte, datum interface{}) ([]byte, error) 
 	return newBuf, nil
 }
 
+
+func (c * Codec) RawFromNative(buf []byte, datum interface{}) ([]byte, error) {
+    newBuf, err := c.BinaryFromNative(buf, datum)
+    if err != nil {
+        return buf, err
+    }
+    header := append(c.avroHeader, c.schemaFingerprint...)
+    return append(header, newBuf...), nil
+}
+
+
 // NativeFromBinary returns a native datum value from the binary encoded byte
 // slice in accordance with the Avro schema supplied when creating the Codec. On
 // success, it returns the decoded datum, along with a new byte slice with the
@@ -258,7 +281,12 @@ func (c *Codec) NativeFromBinary(buf []byte) (interface{}, []byte, error) {
 	return value, newBuf, nil
 }
 
-// NativeFromTextual converts Avro data in JSON text format from the provided byte
+func (c *Codec) NativeFromRaw(buf []byte) (interface{}, []byte, error) {
+    if !bytes.Equal(c.avroHeader, buf[0:2]) {
+        return nil, buf, errors.New("Not a valid avro payload. Missing avro header.")
+    }
+    return c.NativeFromBinary(buf[10:])
+}
 // slice to Go native data types in accordance with the Avro schema supplied
 // when creating the Codec. On success, it returns the decoded datum, along with
 // a new byte slice with the decoded bytes consumed, and a nil error value. On
@@ -357,6 +385,11 @@ func (c *Codec) TextualFromNative(buf []byte, datum interface{}) ([]byte, error)
 //     }
 func (c *Codec) Schema() string {
 	return c.schema
+}
+
+// CanonicalSchema returns the Parsing Canonical Form according to the specification
+func (c *Codec) CanonicalSchema() string {
+	return c.canonicalSchema
 }
 
 // convert a schema data structure to a codec, prefixing with specified
